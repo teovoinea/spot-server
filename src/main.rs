@@ -1,6 +1,9 @@
 extern crate websocket;
 extern crate hyper;
-
+extern crate image;
+#[macro_use]
+extern crate serde_derive;
+extern crate bincode;
 
 use std::thread;
 use std::io::Write;
@@ -8,8 +11,19 @@ use websocket::{Message, OwnedMessage};
 use websocket::sync::Server;
 use hyper::header::{ContentLength, ContentType};
 use hyper::server::{Http, Response, const_service, service_fn};
+use image::{GenericImage, ImageBuffer};
+use bincode::{serialize, deserialize};
 
 const HTML: &'static str = include_str!("websockets.html");
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+struct PaintPixel {
+	x: i32,
+	y: i32,
+	r: u8,
+	g: u8,
+	b: u8,
+}
 
 fn main() {
 	// Start listening for http connections
@@ -48,8 +62,8 @@ fn main() {
 
 			println!("Connection from {}", ip);
 
-			let message = Message::text("Hello");
-			client.send_message(&message).unwrap();
+			//let message = Message::text("Hello");
+			//client.send_message(&message).unwrap();
 
 			let (mut receiver, mut sender) = client.split().unwrap();
 
@@ -67,7 +81,13 @@ fn main() {
 						let message = Message::pong(data);
 						sender.send_message(&message).unwrap();
 					}
-					_ => sender.send_message(&message).unwrap(),
+					OwnedMessage::Binary(data) => {
+						let pixels : PaintPixel = deserialize(&data).unwrap();
+						sender.send_message(&Message::binary(data)).unwrap();
+					}
+					_ => {
+						println!("Got some other data {:?}", message);
+					}
 				}
 			}
 		});
