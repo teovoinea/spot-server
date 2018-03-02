@@ -14,7 +14,3 @@ cargo run --release
 ### rust-websocket
 
 Broadcasts messages between websocket connections using a custom multi producer multi consumer channel scheme
-
-### Hyper
-
-For serving the static html and js (compiled from spot-client)
