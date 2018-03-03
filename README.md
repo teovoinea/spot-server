@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/teovoinea/spot-server.svg?branch=master)](https://travis-ci.org/teovoinea/spot-server)
+
 # spot-server
 
 The server for running the Spot game.
