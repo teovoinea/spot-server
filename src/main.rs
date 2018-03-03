@@ -1,5 +1,4 @@
 extern crate websocket;
-extern crate hyper;
 extern crate image;
 #[macro_use]
 extern crate serde_derive;
@@ -14,12 +13,8 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::{Sender, Receiver};
 use websocket::{Message, OwnedMessage};
 use websocket::sync::Server;
-use hyper::header::{ContentLength, ContentType};
-use hyper::server::{Http, Response, const_service, service_fn};
 use image::{GenericImage, ImageBuffer, Rgb};
 use bincode::{serialize, deserialize};
-
-const HTML: &'static str = include_str!("websockets.html");
 
 lazy_static! {
 	static ref PANEL: Arc<Mutex<ImageBuffer<Rgb<u8>, Vec<u8>>>> = Arc::new(Mutex::new(ImageBuffer::new(640, 480)));
@@ -35,25 +30,6 @@ struct PaintPixel {
 }
 
 fn main() {
-	// Start listening for http connections
-	thread::spawn(move || {
-		                    let addr = ([127, 0, 0, 1], 3000).into();
-
-                            let new_service = const_service(service_fn(|_| {
-                                Ok(Response::<hyper::Body>::new()
-                                    .with_header(ContentLength(HTML.len() as u64))
-                                    .with_header(ContentType::html())
-                                    .with_body(HTML))
-                            }));
-
-                            let server = Http::new()
-                                .sleep_on_errors(true)
-                                .bind(&addr, new_service)
-                                .unwrap();
-                            println!("Listening on http://{} with 1 thread.", server.local_addr().unwrap());
-                            server.run().unwrap();
-		             });
-
 	// Start listening for WebSocket connections
 	let ws_server = Server::bind("127.0.0.1:2794").unwrap();
 	let (init_broadcast_sender, init_broadcast_receiver): (Sender<PaintPixel>, Receiver<PaintPixel>) = mpsc::channel();
