@@ -11,6 +11,13 @@ git clone https://github.com/teovoinea/spot-server
 cargo run --release
 ```
 
+**OR** (soon)
+
+```bash
+cargo install spot-server
+cargo run spot-server
+```
+
 ## Architecture
 
 ### rust-websocket
