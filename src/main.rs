@@ -15,6 +15,7 @@ use websocket::{Message, OwnedMessage};
 use websocket::sync::Server;
 use image::{GenericImage, ImageBuffer, Rgb};
 use bincode::{serialize, deserialize};
+use spmc::SendError;
 
 lazy_static! {
 	static ref PANEL: Arc<Mutex<ImageBuffer<Rgb<u8>, Vec<u8>>>> = Arc::new(Mutex::new(ImageBuffer::new(640, 480)));
@@ -37,8 +38,11 @@ fn main() {
 
 	thread::spawn(move || {
 		for broadcast_pixel in init_broadcast_receiver.iter() {
-			//TODO: error handling
-			let _ = complete_broadcast_sender.send(broadcast_pixel);
+			let b = complete_broadcast_sender.send(broadcast_pixel);
+			match b {
+				Ok(_) => {},
+				Err(e) => println!("Failed to brodcast pixel from main thread {:?}", e)
+			}
 		}
 	});
 
@@ -52,14 +56,11 @@ fn main() {
 				return;
 			}
 
-			let mut client = connection.use_protocol("rust-websocket").accept().unwrap();
+			let client = connection.use_protocol("rust-websocket").accept().unwrap();
 
 			let ip = client.peer_addr().unwrap();
 
 			println!("Connection from {}", ip);
-
-			//let message = Message::text("Hello");
-			//client.send_message(&message).unwrap();
 
 			let (mut receiver, mut sender) = client.split().unwrap();
 			let (sender_chan_sender, sender_chan_recv): (Sender<Message>, Receiver<Message>) = mpsc::channel();
@@ -74,7 +75,12 @@ fn main() {
 			thread::spawn(move || {
 				loop {
 					if let Ok(broadcast_pixel) = send_broadcast.try_recv() {
-						sender_chan_sender2.send(Message::binary(serialize(&broadcast_pixel).unwrap()));
+						let s = sender_chan_sender2.send(Message::binary(serialize(&broadcast_pixel).unwrap()));
+						match s {
+							Ok(_) => {},
+							//This error hits, need to find out why...
+							Err(SendError(e)) => println!("Failed to send broadcasted pixel to client {:?}", e)
+						}
 					}
 				}
 			});
@@ -85,25 +91,37 @@ fn main() {
 				match message {
 					OwnedMessage::Close(_) => {
 						let message = Message::close();
-						sender_chan_sender.send(message);
+						let d = sender_chan_sender.send(message);
+						match d {
+							Ok(_) => {}
+							Err(e) => println!("Failed to send close message {:?}", e)
+						};
 						println!("Client {} disconnected", ip);
 						return;
 					}
 					OwnedMessage::Ping(data) => {
 						let message = Message::pong(data);
-						sender_chan_sender.send(message);
+						match sender_chan_sender.send(message) {
+							Ok(_) => {}
+							Err(e) => println!("Failed to send ping message {:?}", e)
+						};
 					}
 					OwnedMessage::Binary(data) => {
 						let new_pixel : PaintPixel = deserialize(&data).unwrap();
-						if new_pixel.x <= 640 && new_pixel.y <= 480 {
+						if new_pixel.x < 640 && new_pixel.y < 480 {
 							let mut img = PANEL.lock().unwrap();
 							let temp_pixel: Rgb<u8> = Rgb {
 								data: [new_pixel.r, new_pixel.g, new_pixel.b]
 							};
 							img.put_pixel(new_pixel.x as u32, new_pixel.y as u32, temp_pixel);
-							sender_chan_sender.send(Message::binary(data));
-							//TODO: error handling
-							let _ = new_broadcast.send(new_pixel);
+							match sender_chan_sender.send(Message::binary(data)) {
+								Ok(_) => {}
+								Err(e) => println!("Failed to send received pixel to sender thread {:?}", e)
+							};
+							match new_broadcast.send(new_pixel) {
+								Ok(_) => {}
+								Err(e) => println!("Failed to send received pixel to broadcaster thread {:?}", e)
+							};
 						}
 					}
 					_ => {
