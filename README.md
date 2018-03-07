@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/teovoinea/spot-server.svg?branch=master)](https://travis-ci.org/teovoinea/spot-server)
 [![Build status](https://ci.appveyor.com/api/projects/status/h0n4s5ws4fqwjbne?svg=true)](https://ci.appveyor.com/project/teovoinea/spot-server)
+[![dependency status](https://deps.rs/repo/github/teovoinea/spot-server/status.svg)](https://deps.rs/repo/github/teovoinea/spot-server)
 
 
 # spot-server
