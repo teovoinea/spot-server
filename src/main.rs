@@ -11,6 +11,7 @@ use std::thread;
 use std::io::Write;
 use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::{Sender, Receiver};
+use std::u8;
 use websocket::{Message, OwnedMessage};
 use websocket::sync::Server;
 use image::{GenericImage, ImageBuffer, Rgb};
@@ -35,6 +36,13 @@ fn main() {
 	let ws_server = Server::bind("127.0.0.1:2794").unwrap();
 	let (init_broadcast_sender, init_broadcast_receiver): (Sender<PaintPixel>, Receiver<PaintPixel>) = mpsc::channel();
 	let (complete_broadcast_sender, complete_broadcast_receiver): (spmc::Sender<PaintPixel>, spmc::Receiver<PaintPixel>) = spmc::channel();
+
+	{
+		let mut img = PANEL.lock().unwrap();
+		img.pixels_mut().map(|p| {
+			p.data = [u8::MAX, u8::MAX, u8::MAX];
+		}).collect::<Vec<_>>();
+	}
 
 	thread::spawn(move || {
 		for broadcast_pixel in init_broadcast_receiver.iter() {
@@ -64,6 +72,25 @@ fn main() {
 
 			let (mut receiver, mut sender) = client.split().unwrap();
 			let (sender_chan_sender, sender_chan_recv): (Sender<Message>, Receiver<Message>) = mpsc::channel();
+
+			let panel_clone;
+			{
+				let mut img = PANEL.lock().unwrap();
+				panel_clone = img.clone();
+			} //img is dropped here and panel is unlocked
+
+			panel_clone.enumerate_pixels().map(|(x, y, p)| {
+				if p.data != [u8::MAX,u8::MAX,u8::MAX] {
+					let tmp_pixel = PaintPixel {
+						x: x as i32,
+						y: y as i32,
+						r: p.data[0],
+						g: p.data[1],
+						b: p.data[2]
+					};
+					sender_chan_sender.send(Message::binary(serialize(&tmp_pixel).unwrap()));
+				}
+			}).collect::<Vec<_>>();
 
 			thread::spawn(move || {
 				for send_message in sender_chan_recv.iter() {
