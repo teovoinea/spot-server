@@ -83,7 +83,7 @@ fn main() {
 			let panel_clone;
 			{
 				panel_clone = PANEL.lock().unwrap().clone();
-			}
+			} // keep the clone but drop the lock
 
 			panel_clone.enumerate_pixels().map(|(x, y, p)| {
 				if p.data != [u8::MAX,u8::MAX,u8::MAX] { //don't send white pixel on the initial connection because canvas is already white
@@ -137,15 +137,6 @@ fn main() {
 					OwnedMessage::Binary(data) => {
 						let new_pixel : PaintPixel = deserialize(&data).unwrap();
 						if new_pixel.x < 640 && new_pixel.y < 480 {
-							// Can remove this section if we do the drawing locally on client side
-							// #section
-							match sender_chan_sender.send(Message::binary(data)) {
-								Ok(_) => {}
-								Err(e) => println!("Failed to send received pixel to sender thread {:?}", e)
-							};
-							// #endsection
-
-
 							match new_broadcast.send(new_pixel) {
 								Ok(_) => {}
 								Err(e) => println!("Failed to send received pixel to broadcaster thread {:?}", e)
@@ -162,8 +153,7 @@ fn main() {
 }
 
 fn sending(term: Arc<RwLock<bool>>, sender_chan: mpsc::Receiver<websocket::Message>, mut web_sender: websocket::sender::Writer<std::net::TcpStream>) {
-	// Lights up your CPU if you don't uncomment this
-	//let wait = time::Duration::from_millis(50);
+	let wait = time::Duration::from_millis(50);
 	loop {
 		if *term.read().unwrap() {
 			println!("Terminating sender thread");
@@ -172,15 +162,14 @@ fn sending(term: Arc<RwLock<bool>>, sender_chan: mpsc::Receiver<websocket::Messa
 		if let Ok(send_message) = sender_chan.try_recv() {
 			web_sender.send_message(&send_message).unwrap();
 		}
-		else {
-			//thread::sleep(wait);
+		else if cfg!(feature = "low_cpu"){
+			thread::sleep(wait);
 		}
 	}
 }
 
 fn broadcasting(term: Arc<RwLock<bool>>, receiver: spmc::Receiver<PaintPixel>, sender: mpsc::Sender<websocket::Message>) {
-	// Lights up your CPU if you don't uncomment this
-	//let wait = time::Duration::from_millis(50);
+	let wait = time::Duration::from_millis(50);
 	loop {
 		if *term.read().unwrap() == true {
 			println!("Terminating broadcast thread");
@@ -194,8 +183,8 @@ fn broadcasting(term: Arc<RwLock<bool>>, receiver: spmc::Receiver<PaintPixel>, s
 				Err(SendError(e)) => println!("Failed to send broadcasted pixel to client {:?}", e)
 			}
 		}
-		else {
-			//thread::sleep(wait);
+		else if cfg!(feature = "low_cpu") {
+			thread::sleep(wait);
 		}
 	}
 }

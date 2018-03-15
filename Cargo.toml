@@ -11,3 +11,8 @@ serde_derive = "1.0.27"
 bincode = "1.0.0"
 lazy_static = "1.0.0"
 spmc = "0.2.2"
+
+[features]
+default = ["low_cpu"]
+
+low_cpu = []
