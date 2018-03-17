@@ -5,14 +5,10 @@ authors = ["teovoinea <voinea.teodor@gmail.com>"]
 
 [dependencies]
 serde = "1.0"
-websocket = "0.20.2"
+ws = "0.7.3"
 image = "*"
 serde_derive = "1.0.27"
 bincode = "1.0.0"
 lazy_static = "1.0.0"
-spmc = "0.2.2"
-
-[features]
-default = ["low_cpu"]
-
-low_cpu = []
+env_logger = "0.5.5"
+log = "0.4.1"
